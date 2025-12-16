@@ -1,69 +1,143 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Paraboom</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['Space Mono', 'monospace'],
-            },
-            colors: {
-              noise: '#1a1a1a',
-              paper: '#f5f5f5',
-            },
-            animation: {
-              'pulse-fast': 'pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
-            },
-            keyframes: {
-              shake: {
-                '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
-                '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
-                '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
-                '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
-              }
-            }
-          },
-        },
+import React, { useState, useCallback } from 'react';
+import { Post, GrowthStage } from './types';
+import Composer from './components/Composer';
+import Feed from './components/Feed';
+import { mutateText } from './services/geminiService';
+import { Info, X } from 'lucide-react';
+
+const App: React.FC = () => {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [showManifesto, setShowManifesto] = useState(false);
+
+  // Helper to determine stage based on likes
+  const getStage = (likes: number): GrowthStage => {
+    if (likes >= 50) return GrowthStage.LANDSCAPE;
+    if (likes >= 25) return GrowthStage.OVERGROWTH;
+    if (likes >= 10) return GrowthStage.BLOOM;
+    if (likes >= 3) return GrowthStage.SPROUT;
+    return GrowthStage.SEED;
+  };
+
+  const handlePost = (content: string) => {
+    const newPost: Post = {
+      id: Date.now().toString(),
+      content,
+      originalContent: content,
+      likes: 0,
+      createdAt: Date.now(),
+      stage: GrowthStage.SEED,
+      isMutating: false
+    };
+    setPosts(prev => [newPost, ...prev]);
+  };
+
+  const handleLike = useCallback(async (id: string) => {
+    let postToMutate: Post | undefined;
+
+    setPosts(prev => prev.map(post => {
+      if (post.id === id) {
+        const newLikes = post.likes + 1;
+        const newStage = getStage(newLikes);
+        
+        // Check if we entered a new stage to trigger mutation
+        const stageChanged = newStage !== post.stage;
+        
+        const updatedPost = {
+          ...post,
+          likes: newLikes,
+          stage: newStage,
+          isMutating: stageChanged && newLikes > 2 // Only mutate after seed stage
+        };
+
+        if (updatedPost.isMutating) {
+          postToMutate = updatedPost;
+        }
+
+        return updatedPost;
       }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-    <style>
-      /* Hide scrollbar for chrome/safari/opera */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      /* Hide scrollbar for IE, Edge and Firefox */
-      .no-scrollbar {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
-      }
-      body {
-        background-color: #f5f5f5;
-        color: #000;
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.32.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-  <body>
-    <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
-</html>
+      return post;
+    }));
+
+    // Handle AI Mutation effect
+    if (postToMutate) {
+      setTimeout(async () => {
+        if (!postToMutate) return;
+        try {
+          const intensity = Math.min(postToMutate.likes * 2, 100);
+          const mutatedContent = await mutateText(postToMutate.content, intensity);
+          
+          setPosts(prev => prev.map(p => 
+            p.id === postToMutate!.id 
+              ? { ...p, content: mutatedContent, isMutating: false } 
+              : p
+          ));
+        } catch (e) {
+          setPosts(prev => prev.map(p => 
+            p.id === postToMutate!.id ? { ...p, isMutating: false } : p
+          ));
+        }
+      }, 500);
+    }
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[#f5f5f5] text-black font-sans selection:bg-black selection:text-white overflow-hidden">
+      {/* Header */}
+      <header className="fixed top-0 left-0 w-full z-50 bg-[#f5f5f5]/80 backdrop-blur-md border-b border-black/5 px-6 py-4 flex justify-between items-center">
+        <h1 className="text-lg font-black tracking-tighter uppercase">Paraboom</h1>
+        <button 
+          onClick={() => setShowManifesto(true)}
+          className="p-2 hover:bg-black/5 rounded-full transition-colors"
+        >
+          <Info className="w-5 h-5" />
+        </button>
+      </header>
+
+      {/* Main Layout - Full width */}
+      <main className="w-full pt-24 px-4 pb-32 min-h-screen">
+        <div className="mb-12 flex flex-col items-center justify-center relative z-40">
+           <div className="w-full max-w-md">
+            <Composer onPost={handlePost} />
+           </div>
+        </div>
+
+        <Feed posts={posts} onLike={handleLike} />
+      </main>
+
+      {/* Manifesto Modal */}
+      {showManifesto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white max-w-lg w-full p-8 border-4 border-black shadow-2xl relative">
+            <button 
+              onClick={() => setShowManifesto(false)}
+              className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            <h2 className="text-3xl font-black mb-6 uppercase">Concept</h2>
+            <div className="space-y-4 font-mono text-sm leading-relaxed">
+              <p>
+                <strong>Paraboom</strong> is a living text landscape.
+              </p>
+              <p>
+                1. <strong>Plant a Seed</strong>: Write a small thought.
+              </p>
+              <p>
+                2. <strong>Feed It</strong>: Likes make text physically grow (6pt → 72pt).
+              </p>
+              <p>
+                3. <strong>Move It</strong>: Drag text anywhere. Cover the silence.
+              </p>
+              <p className="bg-black text-white p-2 inline-block">
+                "The text grows until there is no whitespace left."
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
