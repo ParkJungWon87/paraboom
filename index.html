@@ -49,6 +49,23 @@
         color: #000;
         overflow-x: hidden; /* Prevent horizontal scroll from dragging */
       }
+      #fallback-message {
+        font-family: 'Inter', sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        text-align: center;
+        padding: 20px;
+        color: #333;
+      }
+      #fallback-message code {
+        background: #eee;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-family: 'Space Mono', monospace;
+      }
     </style>
   <script type="importmap">
 {
@@ -65,7 +82,24 @@
 </script>
 </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="fallback-message">
+        <h1 style="font-weight: 900; font-size: 2rem; margin-bottom: 1rem;">PARABOOM</h1>
+        <p style="max-width: 500px; line-height: 1.6; margin-bottom: 2rem;">
+          The app is loading...<br/><br/>
+          If this screen stays for more than a few seconds, you are likely trying to open the file directly (file:///).
+        </p>
+        <div style="text-align: left; background: white; padding: 20px; border: 2px solid black; border-radius: 12px; box-shadow: 4px 4px 0 rgba(0,0,0,0.1);">
+          <p style="margin-bottom: 10px;"><strong>To run this app locally:</strong></p>
+          <ol style="padding-left: 20px; margin: 0;">
+            <li style="margin-bottom: 8px;">Install Node.js</li>
+            <li style="margin-bottom: 8px;">Open terminal in this folder</li>
+            <li style="margin-bottom: 8px;">Run <code>npm install</code></li>
+            <li>Run <code>npm run dev</code></li>
+          </ol>
+        </div>
+      </div>
+    </div>
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>
